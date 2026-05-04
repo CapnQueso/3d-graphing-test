@@ -140,9 +140,9 @@ public class Body{
     public Double getPerigee()  { return perigee; }
     public Double getApogee()   { return apogee; }
     public Double getAltitude() { return altitude; }
-    public Double X() { return x; }
-    public Double Y() { return y; }
-    public Double Z() { return z; }
+    public Double getX() { return x; }
+    public Double getY() { return y; }
+    public Double getZ() { return z; }
 
 
     // SETTERS
@@ -151,6 +151,9 @@ public class Body{
     public void setAngleX(Double angleX)     { this.angleX = normalizeAngle(angleX); }
     public void setAngleY(Double angleY)     { this.angleY = normalizeAngle(angleY); }
     public void setOrbits(Object orbits)     { this.orbits = orbits; }
+    public void setX(Double x) { this.x = x; }
+    public void setY(Double y) { this.y = y; }
+    public void setZ(Double z) { this.z = z; }
 
     /**
      * Recalculates density when mass changes

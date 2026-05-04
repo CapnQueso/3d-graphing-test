@@ -7,6 +7,11 @@
 public class Star extends Body{
     
     /**
+     * stars name
+     */
+    private String name;
+
+    /**
      * Stars Brightness
      * used for display
      */
@@ -37,30 +42,32 @@ public class Star extends Body{
 
     /**
      * 1 solar radius (for easier input)
-     * 1 solar mass is equal to 6.957 * 10^8 m
+     * 1 solar radius is equal to 6.957 * 10^8 m
      */
     private static final double solarRadius = 6.957e8;
 
     /**
      * Free-floating star with full motion vector
      */
-    public Star(Double mass, Double radius, Double velocity, Double angleX, Double angleY,
+    public Star(String name, Double mass, Double radius, Double velocity, Double angleX, Double angleY,
                 Double brightness, double temperature) {
-        super(mass, radius, velocity, angleX, angleY);
+        super(mass * solarMass, radius * solarRadius, velocity, angleX, angleY);
+        this.name = name;
         this.brightness = brightness;
         this.temperature = temperature;
-        this.luminosity = calcLuminosity(temperature, radius);
+        this.luminosity = calcLuminosity(temperature, radius * solarRadius);
         this.spectralClass = calcSpectralClass(temperature);
     }
 
     /**
      * Free-floating star, motion unknown or to be calculated later
      */
-    public Star(Double mass, Double radius, Double brightness, double temperature) {
-        super(mass, radius);
+    public Star(String name, Double mass, Double radius, Double brightness, double temperature) {
+        super(mass * solarMass, radius * solarRadius);
+        this.name = name;
         this.brightness = brightness;
         this.temperature = temperature;
-        this.luminosity = calcLuminosity(temperature, radius);
+        this.luminosity = calcLuminosity(temperature, radius * solarRadius);
         this.spectralClass = calcSpectralClass(temperature);
     }
 
@@ -68,24 +75,26 @@ public class Star extends Body{
      * Orbiting star with elliptical orbit
      * (e.g. binary star systems)
      */
-    public Star(Double mass, Double radius, Object orbits, Double perigee, Double apogee,
+    public Star(String name, Double mass, Double radius, Object orbits, Double perigee, Double apogee,
                 Double brightness, double temperature) {
-        super(mass, radius, orbits, perigee, apogee);
+        super(mass * solarMass, radius * solarRadius, orbits, perigee, apogee);
+        this.name = name;
         this.brightness = brightness;
         this.temperature = temperature;
-        this.luminosity = calcLuminosity(temperature, radius);
+        this.luminosity = calcLuminosity(temperature, radius * solarRadius);
         this.spectralClass = calcSpectralClass(temperature);
     }
 
     /**
      * Orbiting star with circular orbit
      */
-    public Star(Double mass, Double radius, Object orbits, Double altitude,
+    public Star(String name, Double mass, Double radius, Object orbits, Double altitude,
                 Double brightness, double temperature) {
-        super(mass, radius, orbits, altitude);
+        super(mass * solarMass, radius * solarRadius, orbits, altitude);
+        this.name = name;
         this.brightness = brightness;
         this.temperature = temperature;
-        this.luminosity = calcLuminosity(temperature, radius);
+        this.luminosity = calcLuminosity(temperature, radius * solarRadius);
         this.spectralClass = calcSpectralClass(temperature);
     }
 
@@ -102,12 +111,12 @@ public class Star extends Body{
      * Approximates spectral class from temperature
      */
     private char calcSpectralClass(double temperature) {
-        if (temperature >= 30000) return 'O';
+        if (temperature >= 33000) return 'O';
         if (temperature >= 10000) return 'B';
-        if (temperature >= 7500)  return 'A';
-        if (temperature >= 6000)  return 'F';
-        if (temperature >= 5200)  return 'G';
-        if (temperature >= 3700)  return 'K';
+        if (temperature >= 7300) return 'A';
+        if (temperature >= 6000) return 'F';
+        if (temperature >= 5300) return 'G';
+        if (temperature >= 3900) return 'K';
         return 'M';
     }
 

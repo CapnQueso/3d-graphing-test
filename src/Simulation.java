@@ -35,12 +35,23 @@ public class Simulation {
         sun.setY(0.0);
         sun.setZ(0.0);
 
-        Body earth = new Body("Earth", 5.972e24, 6.371e6, sun, 1.471e11, 1.521e11);
+        Body earth = new Body("Earth", 5.972e24, 6.371e6, sun, 1.471e11);
+        earth.setX(1.471e11);
+        earth.setZ(900000000.0);
+
+        //Body garth = new Body("Garth", 5.972e24, 6.371e6, sun, 1.471e11);
+        //garth.setX(-1.471e11);
 
         sim.addBody(sun);
         sim.addBody(earth);
+        //sim.addBody(garth);
 
         SimulationFX.launch(sim);
+        /**while (true){
+            sim.step(86400);
+            System.out.println(earth.getX() + "  " + earth.getY() + "  " + earth.getZ());
+        }*/
+        
     }
 
     /**

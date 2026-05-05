@@ -1,9 +1,32 @@
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
+import java.awt.geom.Ellipse2D;
 import java.util.List;
-import javax.swing.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
+import javax.swing.JTextField;
+import javax.swing.JToggleButton;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 /**
  * Simple 2D top-down swing visualizer for the N-body simulation
@@ -15,7 +38,7 @@ import javax.swing.*;
 public class SimulationFX extends JFrame {
 
     private static final double AU = 1.496e11;
-    private static final double SCALE = 250.0 / AU;
+    private static final double SCALE = 6.0 / AU;
 
     // ── Camera state ──────────────────────────────────────────────────────────
     private double camX = 0; // pan offset in world meters
@@ -196,6 +219,7 @@ public class SimulationFX extends JFrame {
     // ── Draw scene ────────────────────────────────────────────────────────────
     private void drawScene(Graphics2D g) {
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
         List<Body> bodies = sim.getBodies();
         if (bodies == null || bodies.isEmpty())
@@ -244,10 +268,10 @@ public class SimulationFX extends JFrame {
             Body b = bodies.get(i);
             Color c = bodyColor(b, palette, i);
 
-            int px = (int) ((b.getX() - camX) * scale + W / 2.0);
-            int py = (int) (-(b.getY() - camY) * scale + H / 2.0);
+            double px = (b.getX() - camX) * scale + W / 2.0;
+            double py = -(b.getY() - camY) * scale + H / 2.0;
 
-            int r = computeRadius(b);
+            double r = computeRadius(b);
 
             // Skip drawing if way off screen
             if (px < -200 || px > W + 200 || py < -200 || py > H + 200)
@@ -255,16 +279,16 @@ public class SimulationFX extends JFrame {
 
             // Glow
             g.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 35));
-            g.fillOval(px - r * 2, py - r * 2, r * 4, r * 4);
+            g.fill(new Ellipse2D.Double(px - r * 2, py - r * 2, r * 4, r * 4));
 
             // Body
             g.setColor(c);
-            g.fillOval(px - r, py - r, r * 2, r * 2);
+            g.fill(new Ellipse2D.Double(px - r, py - r, r * 2, r * 2));
 
             // Label
             g.setColor(new Color(c.getRed(), c.getGreen(), c.getBlue(), 200));
             g.setFont(new Font("Monospaced", Font.PLAIN, 11));
-            g.drawString(bodyName(b), px + r + 3, py - 2);
+            g.drawString(bodyName(b), (int) (px + r + 3), (int) (py - 2));
         }
     }
 
@@ -406,10 +430,10 @@ public class SimulationFX extends JFrame {
         return palette[index % palette.length];
     }
 
-    private int computeRadius(Body b) {
+    private double computeRadius(Body b) {
         if (b.getRadius() == null || b.getRadius() <= 0)
-            return 5;
-        return (int) Math.max(4, Math.min(18, Math.log10(b.getRadius()) * 4 - 20));
+            return 5.0;
+        return Math.max(4.0, Math.min(18.0, Math.log10(b.getRadius()) * 4.0 - 20.0));
     }
 
     private String bodyName(Body b) {

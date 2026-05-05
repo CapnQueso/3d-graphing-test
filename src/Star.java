@@ -1,21 +1,17 @@
 /**
  * Multi-body simulation star class
  * using 3d graphics to make it look pretty
+ * 
  * @author capnqueso
  * @date 5/4/26
  */
-public class Star extends Body{
-    
-    /**
-     * stars name
-     */
-    private String name;
+public class Star extends Body {
 
     /**
      * Stars Brightness
      * used for display
      */
-    private Double Brightness;
+    private Double brightness;
 
     /**
      * temperture of the star (in kelvin)
@@ -27,7 +23,7 @@ public class Star extends Body{
      * charachter to determine color class
      * used for display
      */
-    private Char spectralClass;
+    private char spectralClass;
 
     /**
      * energy output in watts
@@ -50,9 +46,8 @@ public class Star extends Body{
      * Free-floating star with full motion vector
      */
     public Star(String name, Double mass, Double radius, Double velocity, Double angleX, Double angleY,
-                Double brightness, double temperature) {
-        super(mass * solarMass, radius * solarRadius, velocity, angleX, angleY);
-        this.name = name;
+            Double brightness, double temperature) {
+        super(name, mass * solarMass, radius * solarRadius); // free floating, set vx, vy, vz later
         this.brightness = brightness;
         this.temperature = temperature;
         this.luminosity = calcLuminosity(temperature, radius * solarRadius);
@@ -63,8 +58,7 @@ public class Star extends Body{
      * Free-floating star, motion unknown or to be calculated later
      */
     public Star(String name, Double mass, Double radius, Double brightness, double temperature) {
-        super(mass * solarMass, radius * solarRadius);
-        this.name = name;
+        super(name, mass * solarMass, radius * solarRadius);
         this.brightness = brightness;
         this.temperature = temperature;
         this.luminosity = calcLuminosity(temperature, radius * solarRadius);
@@ -75,10 +69,9 @@ public class Star extends Body{
      * Orbiting star with elliptical orbit
      * (e.g. binary star systems)
      */
-    public Star(String name, Double mass, Double radius, Object orbits, Double perigee, Double apogee,
-                Double brightness, double temperature) {
-        super(mass * solarMass, radius * solarRadius, orbits, perigee, apogee);
-        this.name = name;
+    public Star(String name, Double mass, Double radius, Body orbits, Double perigee, Double apogee,
+            Double brightness, double temperature) {
+        super(name, mass * solarMass, radius * solarRadius, orbits, perigee, apogee);
         this.brightness = brightness;
         this.temperature = temperature;
         this.luminosity = calcLuminosity(temperature, radius * solarRadius);
@@ -88,10 +81,9 @@ public class Star extends Body{
     /**
      * Orbiting star with circular orbit
      */
-    public Star(String name, Double mass, Double radius, Object orbits, Double altitude,
-                Double brightness, double temperature) {
-        super(mass * solarMass, radius * solarRadius, orbits, altitude);
-        this.name = name;
+    public Star(String name, Double mass, Double radius, Body orbits, Double altitude,
+            Double brightness, double temperature) {
+        super(name, mass * solarMass, radius * solarRadius, orbits, altitude);
         this.brightness = brightness;
         this.temperature = temperature;
         this.luminosity = calcLuminosity(temperature, radius * solarRadius);
@@ -111,13 +103,75 @@ public class Star extends Body{
      * Approximates spectral class from temperature
      */
     private char calcSpectralClass(double temperature) {
-        if (temperature >= 33000) return 'O';
-        if (temperature >= 10000) return 'B';
-        if (temperature >= 7300) return 'A';
-        if (temperature >= 6000) return 'F';
-        if (temperature >= 5300) return 'G';
-        if (temperature >= 3900) return 'K';
+        if (temperature >= 33000)
+            return 'O';
+        if (temperature >= 10000)
+            return 'B';
+        if (temperature >= 7300)
+            return 'A';
+        if (temperature >= 6000)
+            return 'F';
+        if (temperature >= 5300)
+            return 'G';
+        if (temperature >= 3900)
+            return 'K';
         return 'M';
     }
 
+    // GETTERS
+
+
+
+    /**
+     * Gets the star's luminosity (energy output in watts)
+     * @return the luminosity of the star
+     */
+    public Double getLuminosity() {
+        return luminosity;
+    }
+
+    /**
+     * Gets the star's temperature in Kelvin
+     * @return the temperature of the star
+     */
+    public double getTemperature() {
+        return temperature;
+    }
+
+    /**
+     * Gets the star's spectral class
+     * @return the spectral class character (O, B, A, F, G, K, or M)
+     */
+    public char getSpectralClass() {
+        return spectralClass;
+    }
+
+    // SETTERS (debug)
+
+    /**
+     * Sets the star's brightness
+     * @param brightness the brightness value to set
+     */
+    public void setBrightness(Double brightness) {
+        this.brightness = brightness;
+    }
+
+    /**
+     * Sets the star's temperature in Kelvin
+     * Also recalculates luminosity and spectral class based on new temperature
+     * @param temperature the temperature in Kelvin to set
+     */
+    public void setTemperature(double temperature) {
+        this.temperature = temperature;
+        this.luminosity = calcLuminosity(temperature, this.getRadius());
+        this.spectralClass = calcSpectralClass(temperature);
+    }
+
+    /**
+     * Sets the star's luminosity (energy output in watts)
+     * @param luminosity the luminosity value to set
+     */
+    public void setLuminosity(Double luminosity) {
+        this.luminosity = luminosity;
+    }
 }

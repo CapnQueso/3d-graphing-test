@@ -1,38 +1,45 @@
 /**
  * Multi-body simulation base / helper class
  * using 3d graphics to make it look pretty
+ * 
  * @author capnqueso
  * @date 5/4/26
  */
-public class Body{
+public class Body {
 
     /**
-     * Velocity of the body
-     * Measured in m/s
+     * body name
      */
-    private Double velocity;
+    private String name;
+
+    /**
+     * velocity in m/s, can be derived from orbital parameters if orbiting
+     */
+    private double vx, vy, vz;
+
+    /**
+     * angles in degrees, can be derived from orbital parameters if orbiting
+     * angleX is the angle of the velocity vector in the xz plane, measured from the
+     * positive z axis
+     * angleY is the angle of the velocity vector in the xy plane, measured from the
+     * positive y axis
+     */
+    private double ax, ay, az;
+
+    /**
+     * previous acceleration, used for Velocity Verlet integration
+     */
+    private double axPrev, ayPrev, azPrev;
 
     /**
      * positions in the simulation, in meters from origin (arbratrary)
+     * these are the actual positions of the body in the simulation, (scaled to 1 au
+     * = 1 unit in the simulation)
      * (these will change automatically, but will be able to be set and got)
      */
-    private double x;  
+    private double x;
     private double y;
     private double z;
-
-    /**
-     * Angle of motion (vertical)
-     * Must be a value between 0-360
-     * If not a value in that range it will be divided by 360 before getting passed out of class
-     */ 
-    private Double angleY;
-
-    /**
-     * Angle of motion (horizontal) 
-     * Must be a value between 0-360
-     * If not a value in that range it will be divided by 360 before getting passed out of class
-     */
-    private Double angleX;
 
     /**
      * mass of body (kg)
@@ -40,8 +47,15 @@ public class Body{
     private Double mass;
 
     /**
+     * The body that this body orbits (optional)
+     * Typed as Body so any subclass (Star, Planet, Moon, etc.) can be passed in
+     */
+    private Body orbits;
+
+    /**
      * radius of body (m)
-     * all bodies are assumed perfectly round at all times untill a later date. 5/4/26
+     * all bodies are assumed perfectly round at all times untill a later date.
+     * 5/4/26
      */
     private Double radius;
 
@@ -51,25 +65,27 @@ public class Body{
     private Double density;
 
     /**
-     * The Object that this body orbits (optional)
-     */
-    private Object orbits;
-
-    /**
-     * This is the lowest point in orbit (optional)
-     * WARNING: if this is less than radius of the body being orbited, then a collision will occur.
+     * This is the lowest point in orbit (m, optional)
+     * WARNING: if this is less than radius of the body being orbited, then a
+     * collision will occur.
      */
     private Double perigee;
 
     /**
-     * This is the highest point in orbit (optional)
+     * This is the highest point in orbit (m, optional)
      * if no perigee is set, orbit will be perfectly round at altitude [apogee].
-     * WARNING: if this is less than radius of the body being orbited, then a collision will occur.
+     * WARNING: if this is less than radius of the body being orbited, then a
+     * collision will occur.
      */
     private Double apogee;
 
     /**
-     * Altitude above nearest body (can replace perigee on initialization)
+     * eccentricity (internally written to value)
+     */
+    private Double eccentricity;
+
+    /**
+     * Altitude above nearest body (m, can replace perigee on initialization)
      */
     private Double altitude;
 
@@ -78,82 +94,271 @@ public class Body{
     /**
      * Free-floating body with full motion vector
      * Use when the body is not in orbit and motion is known
+     * 
+     * @param mass    the mass of the body in kg
+     * @param radius  the radius of the body in meters
+     * @param orbits  the body that this body orbits
+     * @param perigee the lowest point in orbit in meters
+     * @param apogee  the highest point in orbit in meters
      */
-    public Body(Double mass, Double radius, Double velocity, Double angleX, Double angleY) {
-        this.mass = mass;
-        this.radius = radius;
-        this.velocity = velocity;
-        this.angleX = angleX;
-        this.angleY = angleY;
-        this.density = mass / (Math.PI * Math.pow(radius, 2));
-    }
-    
-    /**
-     * Free-floating body, motion unknown or to be calculated later
-     */
-    public Body(Double mass, Double radius) {
-        this(mass, radius, null, null, null);
-    }
-
-    /**
-     * Orbiting body with elliptical orbit (perigee + apogee)
-     * Velocity and angles can be derived from orbital parameters
-     */
-    public Body(Double mass, Double radius, Object orbits, Double perigee, Double apogee) {
+    public Body(String name, Double mass, Double radius, Body orbits, Double perigee, Double apogee) {
+        this.name = name;
         this.mass = mass;
         this.radius = radius;
         this.orbits = orbits;
         this.perigee = perigee;
         this.apogee = apogee;
-        this.density = mass / (Math.PI * Math.pow(radius, 2));
+        this.density = calcDensity(mass, radius);
+        calcOrbitalVelocity(); // derive vx/vy/vz immediately on construction
     }
 
     /**
-     * Orbiting body with circular orbit (altitude/perigee/apogee only)
-     * apogee and perigee will be equal
+     * Free-floating body, motion unknown or to be calculated later
      */
-    public Body(Double mass, Double radius, Object orbits, Double altitude) {
+    public Body(String name, Double mass, Double radius) {
+        this(name, mass, radius, null, null, null);
+    }
+
+    /**
+     * Orbiting body with circular orbit, orbital parameters derived from altitude
+     * Velocity and angles can be derived from orbital parameters
+     * 
+     * @param mass     the mass of the body in kg
+     * @param radius   the radius of the body in meters
+     * @param orbits   the body that this body orbits
+     * @param altitude the altitude above the orbited body in meters
+     */
+    public Body(String name, Double mass, Double radius, Body orbits, Double altitude) {
+        this.name = name;
         this.mass = mass;
         this.radius = radius;
         this.orbits = orbits;
         this.altitude = altitude;
         this.perigee = altitude;
         this.apogee = altitude;
-        this.density = mass / (Math.PI * Math.pow(radius, 2));
+        this.density = calcDensity(mass, radius);
+        calcOrbitalVelocity();
     }
 
     /**
      * Orbiting body, orbital parameters unknown or to be set later
+     * 
+     * @param mass   the mass of the body in kg
+     * @param radius the radius of the body in meters
+     * @param orbits the body that this body orbits
      */
-    public Body(Double mass, Double radius, Object orbits) {
-        this(mass, radius, orbits, null, null);
+    public Body(String name, Double mass, Double radius, Body orbits) {
+        this.name = name;
+        this.mass = mass;
+        this.radius = radius;
+        this.orbits = orbits;
+        this.density = calcDensity(mass, radius);
     }
 
     // GETTERS
-    public Double getVelocity() { return velocity; }
-    public Double getAngleX()   { return angleX; }
-    public Double getAngleY()   { return angleY; }
-    public Double getMass()     { return mass; }
-    public Double getRadius()   { return radius; }
-    public Double getDensity()  { return density; }
-    public Object getOrbits()   { return orbits; }
-    public Double getPerigee()  { return perigee; }
-    public Double getApogee()   { return apogee; }
-    public Double getAltitude() { return altitude; }
-    public Double getX() { return x; }
-    public Double getY() { return y; }
-    public Double getZ() { return z; }
 
+    /**
+     * Gets the body's name
+     * 
+     * @return the name of the star
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Returns the x velocity components in m/s
+     */
+    public double getVelocityX() {
+        return vx;
+    }
+
+    /**
+     * Returns the y velocity components in m/s
+     */
+    public double getVelocityY() {
+        return vy;
+    }
+
+    /**
+     * Returns the z velocity components in m/s
+     */
+    public double getVelocityZ() {
+        return vz;
+    }
+
+    /**
+     * Returns the acceleration in the X direction.
+     */
+    public double getAccX() {
+        return ax;
+    }
+
+    /**
+     * Returns the acceleration in the Y direction.
+     */
+    public double getAccY() {
+        return ay;
+    }
+
+    /**
+     * Returns the acceleration in the Z direction.
+     */
+    public double getAccZ() {
+        return az;
+    }
+
+    /**
+     * Returns the body that this body orbits.
+     */
+    public Body getOrbits() {
+        return orbits;
+    }
+
+    /**
+     * Returns the mass of the body.
+     */
+    public Double getMass() {
+        return mass;
+    }
+
+    /**
+     * Returns the radius of the body.
+     */
+    public Double getRadius() {
+        return radius;
+    }
+
+    /**
+     * Returns the density of the body.
+     */
+    public Double getDensity() {
+        return density;
+    }
+
+    /**
+     * Returns the perigee of the orbit.
+     */
+    public Double getPerigee() {
+        return perigee;
+    }
+
+    /**
+     * Returns the apogee of the orbit.
+     */
+    public Double getApogee() {
+        return apogee;
+    }
+
+    /**
+     * Returns the altitude of the body.
+     */
+    public Double getAltitude() {
+        return altitude;
+    }
+
+    /**
+     * Returns the X position of the body.
+     */
+    public Double getX() {
+        return x;
+    }
+
+    /**
+     * Returns the Y position of the body.
+     */
+    public Double getY() {
+        return y;
+    }
+
+    /**
+     * Returns the Z position of the body.
+     */
+    public Double getZ() {
+        return z;
+    }
 
     // SETTERS
 
-    public void setVelocity(Double velocity) { this.velocity = velocity; }
-    public void setAngleX(Double angleX)     { this.angleX = normalizeAngle(angleX); }
-    public void setAngleY(Double angleY)     { this.angleY = normalizeAngle(angleY); }
-    public void setOrbits(Object orbits)     { this.orbits = orbits; }
-    public void setX(Double x) { this.x = x; }
-    public void setY(Double y) { this.y = y; }
-    public void setZ(Double z) { this.z = z; }
+    /**
+     * Sets the body's name
+     * 
+     * @param name the name to set
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * Sets the velocity in the X direction.
+     */
+    public void setVelocityX(double vx) {
+        this.vx = vx;
+    }
+
+    /**
+     * Sets the velocity in the Y direction.
+     */
+    public void setVelocityY(double vy) {
+        this.vy = vy;
+    }
+
+    /**
+     * Sets the velocity in the Z direction.
+     */
+    public void setVelocityZ(double vz) {
+        this.vz = vz;
+    }
+
+    /**
+     * Returns the previous acceleration in the X direction.
+     */
+    public double getAccPrevX() {
+        return axPrev;
+    }
+
+    /**
+     * Returns the previous acceleration in the Y direction.
+     */
+    public double getAccPrevY() {
+        return ayPrev;
+    }
+
+    /**
+     * Returns the previous acceleration in the Z direction.
+     */
+    public double getAccPrevZ() {
+        return azPrev;
+    }
+
+    /**
+     * Sets the X position of the body.
+     */
+    public void setX(Double x) {
+        this.x = x;
+    }
+
+    /**
+     * Sets the Y position of the body.
+     */
+    public void setY(Double y) {
+        this.y = y;
+    }
+
+    /**
+     * Sets the Z position of the body.
+     */
+    public void setZ(Double z) {
+        this.z = z;
+    }
+
+    /**
+     * Sets the body that this body orbits.
+     */
+    public void setOrbits(Body orbits) {
+        this.orbits = orbits;
+        calcOrbitalVelocity(); // recalculate when orbit changes
+    }
 
     /**
      * Recalculates density when mass changes
@@ -176,7 +381,7 @@ public class Body{
      */
     public void setPerigee(Double perigee) {
         this.perigee = perigee;
-        this.velocity = calcOrbitalVelocity();
+        calcOrbitalVelocity();
     }
 
     /**
@@ -184,7 +389,96 @@ public class Body{
      */
     public void setApogee(Double apogee) {
         this.apogee = apogee;
-        this.velocity = calcOrbitalVelocity();
+        calcOrbitalVelocity();
     }
 
+    // HELPERS
+
+    /**
+     * Saves the current acceleration values to previous acceleration values.
+     */
+    public void saveAcc() {
+        axPrev = ax;
+        ayPrev = ay;
+        azPrev = az;
+    }
+
+    /**
+     * Resets the acceleration components to zero.
+     */
+    public void zeroAcc() {
+        ax = 0;
+        ay = 0;
+        az = 0;
+    }
+
+    /**
+     * Adds the given acceleration components to the current acceleration.
+     * 
+     * @param dax the change in x-acceleration
+     * @param day the change in y-acceleration
+     * @param daz the change in z-acceleration
+     */
+    public void addAcc(double dax, double day, double daz) {
+        ax += dax;
+        ay += day;
+        az += daz;
+    }
+
+    /**
+     * Calculates the density of the body based on its mass and radius
+     * 
+     * @param mass   the mass of the body
+     * @param radius the radius of the body
+     * @return the density of the body
+     */
+    private Double calcDensity(Double mass, Double radius) {
+        return mass / (Math.PI * Math.pow(radius, 2));
+    }
+
+    /**
+     * Normalizes an angle to be between 0 and 360 degrees
+     * 
+     * @param angle the angle to normalize
+     * @return the normalized angle
+     */
+    private Double normalizeAngle(Double angle) {
+        if (angle == null)
+            return null;
+        angle = angle % 360;
+        if (angle < 0)
+            angle += 360;
+        return angle;
+    }
+
+    /**
+     * Calculates orbital velocity vector at perigee and sets vx, vy, vz.
+     * At perigee, velocity is purely tangential (perpendicular to radius).
+     * Assumes orbit in XY plane body starts at (perigee, 0, 0) moving in +Y
+     * direction.
+     * Uses vis-viva: v = sqrt(μ * (2/r - 1/a))
+     */
+    private void calcOrbitalVelocity() {
+        if (orbits == null || !(orbits instanceof Body))
+            return;
+        if (perigee == null || apogee == null)
+            return;
+
+        Body parent = (Body) orbits;
+        double mu = 6.674e-11 * parent.getMass();
+        double a = (perigee + apogee) / 2.0;
+        double r = perigee;
+
+        double speed = Math.sqrt(mu * (2.0 / r - 1.0 / a));
+
+        // At perigee, velocity is tangential (+Y direction if body starts on +X axis)
+        this.vx = 0;
+        this.vy = speed;
+        this.vz = 0;
+
+        // Set starting position at perigee on +X axis
+        this.setX(perigee);
+        this.setY(0.0);
+        this.setZ(0.0);
+    }
 }

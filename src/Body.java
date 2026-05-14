@@ -437,21 +437,6 @@ public class Body {
     }
 
     /**
-     * Normalizes an angle to be between 0 and 360 degrees
-     * 
-     * @param angle the angle to normalize
-     * @return the normalized angle
-     */
-    private Double normalizeAngle(Double angle) {
-        if (angle == null)
-            return null;
-        angle = angle % 360;
-        if (angle < 0)
-            angle += 360;
-        return angle;
-    }
-
-    /**
      * Calculates orbital velocity vector at perigee and sets vx, vy, vz.
      * At perigee, velocity is purely tangential (perpendicular to radius).
      * Assumes orbit in XY plane body starts at (perigee, 0, 0) moving in +Y

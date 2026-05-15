@@ -438,9 +438,7 @@ public class Body {
 
     /**
      * Calculates orbital velocity vector at perigee and sets vx, vy, vz.
-     * At perigee, velocity is purely tangential (perpendicular to radius).
-     * Assumes orbit in XY plane body starts at (perigee, 0, 0) moving in +Y
-     * direction.
+     * At perigee, velocity is purely perpendicular to radius.
      * Uses vis-viva: v = sqrt(μ * (2/r - 1/a))
      */
     private void calcOrbitalVelocity() {
@@ -456,14 +454,18 @@ public class Body {
 
         double speed = Math.sqrt(mu * (2.0 / r - 1.0 / a));
 
-        // At perigee, velocity is tangential (+Y direction if body starts on +X axis)
-        this.vx = 0;
-        this.vy = speed;
-        this.vz = 0;
+        // At perigee, we set the speed vector in a random direction perpendicular to the radius vector.
+        double orbitalAngle = Math.random() * 360;
+        double angleRad = Math.toRadians(orbitalAngle);
+        vx = -speed * Math.sin(angleRad);
+        vy = speed * Math.cos(angleRad);
+        vz = 0; 
 
-        // Set starting position at perigee on +X axis
-        this.setX(perigee);
-        this.setY(0.0);
-        this.setZ(0.0);
+        // Set starting position at random angle perigee distance from parent
+        double positionAngle = Math.random() * 360;
+        double positionRad = Math.toRadians(positionAngle);
+        x = parent.getX() + r * Math.cos(positionRad);
+        y = parent.getY() + r * Math.sin(positionRad);
+        z = parent.getZ();
     }
 }

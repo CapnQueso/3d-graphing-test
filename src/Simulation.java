@@ -30,42 +30,59 @@ public class Simulation {
      */
     private double time;
 
-    public static void main(String[] args) throws IOException {
+    private static final double AU = 1.496e11; // Astronomical unit in meters
+
+    // MAKE SURE THIS FILEPATH IS CORRECT
+    private static final String DIR = "3d-graphing-test/src/"; // Directory for output files
+
+    public static void main(String[] args) throws InterruptedException {
         Simulation sim = new Simulation();
-        PrintWriter writer = new PrintWriter(new FileWriter("C:\\Users\\1047795\\OneDrive - Lake Washington School District\\LWHS.23-27\\Grade 11 25-26\\Data Structures\\School VSC workspace\\3d-graphing-test\\src\\positions.txt"));
-        //PrintWriter writer = new PrintWriter(new FileWriter("/home/queso/Documents/Coding projects/3d-graphing-test/src/positions.txt"));
 
-        Star sun = new Star("Sol", 2.0, 1.0, 1.0, 5778);
-        sun.setX(0.0);
-        sun.setY(0.0);
-        sun.setZ(0.0);
-
-        Body earth = new Body("Earth", 5.972e24, 6.371e6, sun, 1.471e14);
-        earth.setZ(1.0e13);
-
-        Body garth = new Body("Garth", 5.972e24, 6.371e6, sun, 1.471e11);
+        // Setup your system
+        Star sun = new Star("Sol", 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 5778);
+        Body earth = new Body("Earth", 5.972e24, 6.371e6, sun, 1.47e11);
+        Body mars = new Body("Mars", 6.39e23, 3.389e6, sun, 2.27e11);
 
         sim.addBody(sun);
         sim.addBody(earth);
-        sim.addBody(garth);
+        sim.addBody(mars);
 
-        StringBuilder header = new StringBuilder("#METADATA|");
-        for (Body b : sim.getBodies()) {
-            header.append(b.getName()).append(",").append(b.getRadius()).append(",").append(b.getMass());
-            if (b instanceof Star) {
-                header.append(",").append(((Star) b).getTemperature()); //
+        // WRITE METADATA ONCE
+        try (PrintWriter metaWriter = new PrintWriter(new FileWriter(DIR + "metadata.txt"))) {
+            StringBuilder sb = new StringBuilder();
+            for (Body b : sim.bodies) {
+                String type = (b instanceof Star) ? "STAR" : "PLANET";
+                double temp = (b instanceof Star) ? ((Star) b).getTemperature() : 0;
+                sb.append(type).append(",").append(b.getName()).append(",")
+                        .append(b.getRadius()).append(",").append(b.getMass()).append(",")
+                        .append(temp).append("|");
             }
-            header.append("|");
-        }
-        writer.println(header.toString());
-
-        //SimulationFX.launch(sim);
-        for (int i = 0; i < 1000000; i++) {
-            sim.step(86400);
-            writer.println(sun.getX() + "  " + sun.getY() + "  " + sun.getZ() + " | " + earth.getX() + "  " + earth.getY() + "  " + earth.getZ() + " | " + garth.getX() + "  " + garth.getY() + "  " + garth.getZ() + " | " + sim.getTime());
+            metaWriter.println(sb.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
         }
 
-        writer.close();
+        System.out.println("Simulation running... Open index.html to view live.");
+
+        // LIVE LOOP
+        while (true) {
+            sim.step(3600); // 1 hour per step
+
+            // We overwrite live.txt every frame so it never gets too big
+            try (PrintWriter writer = new PrintWriter(new FileWriter(DIR + "live.txt"))) {
+                StringBuilder line = new StringBuilder();
+                for (Body b : sim.bodies) {
+                    line.append(b.getX()).append(" ").append(b.getY()).append(" ").append(b.getZ()).append("|");
+                }
+                line.append(sim.time);
+                writer.println(line.toString());
+            } catch (IOException e) {
+                // If the browser is reading while we are writing, just skip this frame
+            }
+
+            // Limit the speed so we don't melt the CPU
+            Thread.sleep(10);
+        }
     }
 
     /**

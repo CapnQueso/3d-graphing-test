@@ -1,40 +1,142 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Orbit Simulation Viewer</title>
+    <title>Live 1:1 Solar System</title>
     <style>
-        body { margin: 0; background: #000; color: white; font-family: sans-serif; overflow: hidden; }
-        #ui { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; }
+        body { margin: 0; background: #000; color: #eee; font-family: 'Courier New', monospace; overflow: hidden; }
+        #ui { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.85); padding: 15px; border: 1px solid #444; width: 220px; }
+        #stats-pane { position: absolute; top: 15px; right: 15px; background: rgba(0,0,0,0.85); padding: 15px; border: 1px solid #00ffcc; width: 260px; display: none; }
+        .stat-row { display: flex; justify-content: space-between; margin: 5px 0; font-size: 13px; border-bottom: 1px solid #222; }
+        .val { color: #00ffcc; }
+        .nav-btn { width: 100%; padding: 8px; margin: 4px 0; background: #111; border: 1px solid #444; color: white; cursor: pointer; text-align: left; }
+        .nav-btn:hover { background: #333; border-color: #00ffcc; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h3>Sim Visualizer</h3>
-        <input type="file" id="fileInput" accept=".txt"><br><br>
-        <div id="status">Upload positions.txt to start</div>
-    </div>
-    <div id="container"></div>
 
-    <script type="module">
-        import SimulationView from './visualizer.js';
-        const view = new SimulationView('container');
-        
-        document.getElementById('fileInput').onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const lines = reader.result.split('\n');
-                let currentFrame = 0;
+    <div id="ui">
+        <h2 style="margin:0 0 10px 0; font-size:16px;">Live Simulation</h2>
+        <div id="nav-list">Connecting to Java...</div>
+        <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+        <div style="font-size:10px; color:#888;">Queso's Live Simulation</div>
+    </div>
+
+    <div id="stats-pane">
+        <h3 id="target-name" style="margin:0 0 10px 0; color:#00ffcc;">Body Name</h3>
+        <div class="stat-row">Mass: <span class="val" id="stat-mass">-</span></div>
+        <div class="stat-row">Radius: <span class="val" id="stat-rad">-</span></div>
+        <div class="stat-row">X: <span class="val" id="stat-x">-</span></div>
+        <div class="stat-row">Y: <span class="val" id="stat-y">-</span></div>
+        <button onclick="document.getElementById('stats-pane').style.display='none'" style="width:100%; margin-top:10px; cursor:pointer;">Close</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const DIST_SCALE = 1e-9; 
+        let scene, camera, renderer, controls, bodies = [];
+        let focusedBody = null;
+
+        async function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.0001, 10000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            camera.position.set(50, 50, 50);
+
+            // 1. STARFIELD BACKGROUND
+            const starGeo = new THREE.BufferGeometry();
+            const positions = [];
+            for(let i=0; i<10000; i++) {
+                positions.push((Math.random()-0.5)*3000, (Math.random()-0.5)*3000, (Math.random()-0.5)*3000);
+            }
+            starGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 1})));
+
+            await loadMetadata();
+            requestAnimationFrame(renderLoop);
+            setInterval(pollLiveUpdate, 16); // Poll 60 times a second
+        }
+
+        async function loadMetadata() {
+            const res = await fetch('metadata.txt');
+            const text = await res.text();
+            const items = text.split('|').filter(x => x.trim().length > 0);
+            
+            document.getElementById('nav-list').innerHTML = '';
+            items.forEach((m, i) => {
+                const [type, name, radius, mass, temp] = m.split(',');
+                const r = parseFloat(radius) * DIST_SCALE;
+                const color = type === "STAR" ? 0xfff4ea : 0x3498db;
+
+                const geo = new THREE.SphereGeometry(r, 32, 32);
+                const mat = new THREE.MeshStandardMaterial({ color: color });
                 
-                setInterval(() => {
-                    if (currentFrame < lines.length) {
-                        const coords = view.parseLine(lines[currentFrame]);
-                        view.updatePositions(coords);
-                        currentFrame++;
-                    }
-                }, 16); // ~60fps playback
-            };
-            reader.readAsText(e.target.files[0]);
-        };
+                if(type === "STAR") {
+                    mat.emissive = new THREE.Color(color);
+                    mat.emissiveIntensity = 0.8;
+                    // 2. DYNAMIC LIGHTING
+                    const light = new THREE.PointLight(color, 2.5, 2000);
+                    scene.add(light);
+                    this.light = light;
+                }
+
+                const mesh = new THREE.Mesh(geo, mat);
+                const trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: color, transparent:true, opacity:0.2}));
+                
+                const bodyObj = { name, radius, mass, mesh, trail, light: this.light, history: [] };
+                bodies.push(bodyObj);
+                scene.add(mesh);
+                scene.add(trail);
+
+                const btn = document.createElement('button');
+                btn.className = 'nav-btn';
+                btn.innerText = "Target: " + name;
+                btn.onclick = () => { focusedBody = bodyObj; document.getElementById('stats-pane').style.display='block'; };
+                document.getElementById('nav-list').appendChild(btn);
+            });
+        }
+
+        async function pollLiveUpdate() {
+            try {
+                const res = await fetch('live.txt?t=' + Date.now()); // Date.now avoids cache
+                const text = await res.text();
+                const parts = text.split('|');
+                
+                parts.slice(0, -1).forEach((coords, i) => {
+                    if(!bodies[i]) return;
+                    const [x, y, z] = coords.trim().split(' ').map(n => parseFloat(n) * DIST_SCALE);
+                    
+                    bodies[i].mesh.position.set(x, y, z);
+                    if(bodies[i].light) bodies[i].light.position.set(x, y, z);
+
+                    bodies[i].history.push(new THREE.Vector3(x, y, z));
+                    if(bodies[i].history.length > 400) bodies[i].history.shift();
+                    bodies[i].trail.geometry.setFromPoints(bodies[i].history);
+                });
+
+                if(focusedBody) {
+                    controls.target.copy(focusedBody.mesh.position);
+                    document.getElementById('target-name').innerText = focusedBody.name;
+                    document.getElementById('stat-mass').innerText = Number(focusedBody.mass).toExponential(2) + " kg";
+                    document.getElementById('stat-rad').innerText = (focusedBody.radius/1000).toLocaleString() + " km";
+                    document.getElementById('stat-x').innerText = (focusedBody.mesh.position.x/DIST_SCALE).toExponential(2);
+                    document.getElementById('stat-y').innerText = (focusedBody.mesh.position.y/DIST_SCALE).toExponential(2);
+                }
+            } catch(e) {}
+        }
+
+        function renderLoop() {
+            requestAnimationFrame(renderLoop);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
     </script>
 </body>
 </html>

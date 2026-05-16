@@ -33,15 +33,15 @@ public class Simulation {
     private static final double AU = 1.496e11; // Astronomical unit in meters
 
     // MAKE SURE THIS FILEPATH IS CORRECT
-    private static final String DIR = "3d-graphing-test/src/"; // Directory for output files
+    private static final String DIR = "src/"; // Directory for output files
 
     public static void main(String[] args) throws InterruptedException {
         Simulation sim = new Simulation();
 
-        // Setup your system
-        Star sun = new Star("Sol", 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 5778);
-        Body earth = new Body("Earth", 5.972e24, 6.371e6, sun, 1.47e11);
-        Body mars = new Body("Mars", 6.39e23, 3.389e6, sun, 2.27e11);
+        // Setup your system using true physical units
+        Star sun = new Star("Sol", 1.989e30, 6.957e8, 0.0, 0.0, 0.0, 1.0, 5778);
+        Body earth = new Body("Earth", 5.972e24, 6.371e6, sun, AU);
+        Body mars = new Body("Mars", 6.39e23, 3.389e6, sun, 1.52368055 * AU);
 
         sim.addBody(sun);
         sim.addBody(earth);
@@ -51,24 +51,54 @@ public class Simulation {
         try (PrintWriter metaWriter = new PrintWriter(new FileWriter(DIR + "metadata.txt"))) {
             StringBuilder sb = new StringBuilder();
             for (Body b : sim.bodies) {
-                String type = (b instanceof Star) ? "STAR" : "PLANET";
-                double temp = (b instanceof Star) ? ((Star) b).getTemperature() : 0;
-                sb.append(type).append(",").append(b.getName()).append(",")
-                        .append(b.getRadius()).append(",").append(b.getMass()).append(",")
-                        .append(temp).append("|");
+                String type = "PLANET";
+                double temp = 0.0;
+                double lum = 0.0;
+
+                if (b instanceof Star) {
+                    type = "STAR";
+                    Star s = (Star) b;
+                    temp = s.getTemperature();
+                    lum = s.getLuminosity();
+                }
+
+                sb.append(type).append(",")
+                        .append(b.getName()).append(",")
+                        .append(b.getRadius()).append(",")
+                        .append(b.getMass()).append(",")
+                        .append(temp).append(",")
+                        .append(lum).append("|");
             }
-            metaWriter.println(sb.toString());
+            metaWriter.print(sb.toString());
+            metaWriter.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Error writing metadata file: " + e.getMessage());
         }
 
         System.out.println("Simulation running... Open index.html to view live.");
 
+        double activeTimeStep = 3600.0; // Default fallback to 1 hour step value
+        java.io.File timestepFile = new java.io.File(DIR + "timestep.txt");
+
         // LIVE LOOP
         while (true) {
-            sim.step(3600); // 1 hour per step
+            // Check if Python dropped a new timestep configuration file down
+            if (timestepFile.exists() && timestepFile.canRead()) {
+                try (java.util.Scanner sc = new java.util.Scanner(timestepFile)) {
+                    if (sc.hasNextDouble()) {
+                        activeTimeStep = sc.nextDouble();
+                    }
+                } catch (Exception e) {
+                    // Fail silently to avoid stopping the loop if python was actively writing to
+                    // the file
+                }
+            }
 
-            // We overwrite live.txt every frame so it never gets too big
+            // Advance the orbital universe calculations using our dynamic velocity step
+            // size!
+            sim.step(activeTimeStep);
+
+            // Overwrite live.txt every frame
             try (PrintWriter writer = new PrintWriter(new FileWriter(DIR + "live.txt"))) {
                 StringBuilder line = new StringBuilder();
                 for (Body b : sim.bodies) {
@@ -77,10 +107,10 @@ public class Simulation {
                 line.append(sim.time);
                 writer.println(line.toString());
             } catch (IOException e) {
-                // If the browser is reading while we are writing, just skip this frame
+                // Skip frame write collision conflict mitigations
             }
 
-            // Limit the speed so we don't melt the CPU
+            // Limit calculation frequency overhead
             Thread.sleep(10);
         }
     }
